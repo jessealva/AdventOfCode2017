@@ -26,38 +26,33 @@ public class Day8 {
     }
 
     public static void main(String[] args) {
+        System.out.println("Test TEST_P2 should have a max size of " + getHighestValueRegisterP2(TEST_P1) + " but should be 1.");
         System.out.println("Test TEST_P1 should have a max size of " + getHighestValueRegisterP1(TEST_P1) + " but should be 1.");
+        System.out.println("Test FINAL_TEST_P2 should have a max size of " + getHighestValueRegisterP2(FINAL_TEST_P1));
         System.out.println("Test FINAL_TEST_P1 should have a max size of " + getHighestValueRegisterP1(FINAL_TEST_P1));
-        System.out.println("alternate: " + Collections.max(registers.values()));
     }
 
     public static int getHighestValueRegisterP1(String[] instructions) {
+        return Collections.max(registers.values());
+    }
+
+    public static int getHighestValueRegisterP2(String[] instructions) {
         registers = new HashMap<>(instructions.length);
         Instruction[] instrs = new Instruction[instructions.length];
+
         for(int i = 0 ; i < instructions.length; ++i) {
             if(instructions[i].length() == 0) {
                 continue;
             }
             instrs[i] = new Instruction(instructions[i]);
-            //registers.put(instrs[i].registerName, 0);
         }
-        System.out.println(instrs.length);
-        int count = 0;
+        int maxFromTotal = Integer.MIN_VALUE;
         for(int i = 0 ; i < instrs.length; ++i) {
-//            System.out.println(instrs[i]);
-            if(instrs[i].perform(registers)) {
-                count++;
-            }
+            instrs[i].perform(registers);
+            int currMax = Collections.max(registers.values());
+            maxFromTotal = currMax > maxFromTotal ? currMax : maxFromTotal;
         }
-
-        System.out.println("Actually performed " + count+ " operations.");
-        int maxValue = Integer.MIN_VALUE;
-        for(String regName : registers.keySet()) {
-            if(registers.get(regName) > maxValue) {
-                maxValue = registers.get(regName);
-            }
-        }
-        return maxValue;
+        return maxFromTotal;
     }
 
     private enum IOP {
@@ -95,7 +90,6 @@ public class Day8 {
                         registers.get(registerName) + changeValue :
                             registers.get(registerName) - changeValue;
                 registers.put(registerName, newValue);
-                System.out.println(registers);
                 return true;
             }
             return false;
