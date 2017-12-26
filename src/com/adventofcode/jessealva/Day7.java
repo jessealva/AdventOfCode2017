@@ -1,6 +1,5 @@
 package com.adventofcode.jessealva;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -16,8 +15,11 @@ public class Day7 {
     public static final Program[] TEST_FINAL_P1;
 
     public static void main(String[] args) {
-        System.out.println("Bottom program for input TEST_P1_1 is: '" + getParentP1(TEST_P1_1) + "' but should be 'tknk'");
-        System.out.println("Bottom program for input TEST_FINAL_P1 is: '" + getParentP1(TEST_FINAL_P1) + "'");
+        System.out.println("Bottom program for input TEST_P1_1 is: '" + getParentP1(TEST_P1_1).name + "' but should be 'tknk'");
+        System.out.println("Bottom program for input TEST_FINAL_P1 is: '" + getParentP1(TEST_FINAL_P1).name + "'");
+
+        System.out.println("Offset required to balance plates for TEST_P2_1 is: " + getWeightAdjustmentNeededP2(TEST_P1_1) + " and should be 60.");
+        System.out.println("Offset required to balance plates for TEST_FINAL_P2 is: " + getWeightAdjustmentNeededP2(TEST_FINAL_P1) + " and should be 529.");
     }
 
     /*
@@ -26,7 +28,7 @@ public class Day7 {
     of the other parents.  So we can create a list of all parents, and remove them as we find then while we're
     processing all the children from each prospective parent.
      */
-    public static String getParentP1(Program[] apps) {
+    public static Program getParentP1(Program[] apps) {
         Map<Program, Boolean> parents = new HashMap<>(apps.length);
         Set<String> children = new HashSet<>(apps.length);
         for(Program p : apps) {
@@ -37,81 +39,97 @@ public class Day7 {
                 }
             }
         }
-        String parent = null;
+        Program parent = null;
         for(Program p : parents.keySet()) {
             if (!children.contains(p.name)) {
-                parent = p.name;
+                parent = p;
             }
         }
         return parent;
     }
 
     public static int getWeightAdjustmentNeededP2(Program[] apps) {
-        int adjustment = 0;
         Map<String, Program> lookup = createLookupTable(apps);
-        String parent = getParentP1(apps);
-        //Get the bottom most program
-        Program p = lookup.get(parent);
-        //Starting from there, lets get the total weight for him and all his children, which should walk down
-        //The entire tree.
-        getTotalWeight(p, lookup);
+        Program parent = getParentP1(apps);
         //We now have the parent, and each nodes total weight.  Lets figure out which disk is unbalanced.
-        Program unbalancedWeight = findUnbalanced(p, lookup);
+        Node root = buildTree(parent, lookup);
 
-        return adjustment;
+        return getAdjustmentToBalanceDisks(root);
     }
 
-    private static Program findUnbalanced(Program start, Map<String, Program> lookup) {
-        Program unbalanced = null;
-        //int[] childTotalsWeights = new int[start.childIds.length];
-        /*
-        Need to figure out which one is different from the rest.  If there's only two children off the bottom node, then
-        we need to check each of them more cause we really don't know which one is wrong.
-         */
-        //int tot = lookup.get(start.childIds[0]).totalWeight;
-        Map<Integer, Integer> map = new HashMap<>(2);
-        //map.put(tot, 0);
-        int unique_one = 0;
-        for(int i = 0 ; i < start.childIds.length; ++i) {
-            int tot = lookup.get(start.childIds[i]).totalWeight;
-            if(map.containsKey(tot)) {
-                map.put(tot, map.get(tot) + i);
-            } else {
-                map.put(tot, i);
-            }
+    private static int getAdjustmentToBalanceDisks(Node start) {
+        //The only one that needs to check are parents.  Children are by default ok as they have nothing to check.
+        //Parents on the other hand have to check that all their children have the same weight, so that they are balanced.
+        if(start.children == null || start.children.length == 0) {
+            return 0;
         }
-        Collection<Integer> vals = map.values();
-        int uniqIdx = -1;
-        for (Integer v : vals) {
-            if (v < start.childIds.length) {
-                uniqIdx = v;
+        Map<Integer, Integer> weightToIndex = new HashMap<>();
+        Map<Integer, Integer> weightToCount = new HashMap<>();
+        int adjustedWeight = 0;
+        //Builds the lists of weight (they keys) to how many were seen and weight (key) to the index in the
+        //child array. The thought is that if the disk is balanced, both maps will contain a single key. If the
+        //maps contain 2 keys, then we
+        for (int i = 0 ; i < start.children.length ; ++i) {
+            adjustedWeight = getAdjustmentToBalanceDisks(start.children[i]);
+            if (adjustedWeight > 0) {
                 break;
             }
-        }
-        if (uniqIdx != -1) {
-            Program badChild = lookup.get(start.childIds[uniqIdx]);
-        }
-
-        return unbalanced;
-    }
-
-    private static Map<String, Program> createLookupTable(Program[] programs) {
-        Map<String, Program> lookup = new HashMap<>(programs.length);
-        for(Program p: programs) {
-            lookup.put(p.name, p);
-        }
-        return lookup;
-    }
-
-    private static int getTotalWeight(Program p, Map<String, Program> programs) {
-        int total = p.weight;
-        if(p.childIds != null) {
-            for(String i : p.childIds) {
-                total += getTotalWeight(programs.get(i), programs);
+            int key = start.children[i].p.totalWeight;
+            weightToIndex.put(key, i);
+            if(weightToCount.containsKey(key)) {
+                weightToCount.put(key, weightToCount.get(key)+1);
+            } else {
+                weightToCount.put(key, 1);
             }
         }
-        p.totalWeight = total;
-        return total;
+        if(adjustedWeight > 0) {
+            return adjustedWeight;
+        }
+        int shouldBeWeight = 0;
+        int badTotalWeight = 0;
+        int badWeight = 0;
+        for(int key : weightToCount.keySet()) {
+            if(weightToCount.get(key) == 1) {
+                badTotalWeight = start.children[weightToIndex.get(key)].p.totalWeight;
+                badWeight = start.children[weightToIndex.get(key)].p.weight;
+            } else {
+                shouldBeWeight = start.children[weightToIndex.get(key)].p.totalWeight;
+            }
+        }
+
+        if (badWeight > 0) {
+            boolean subtract = badTotalWeight > shouldBeWeight;
+            int offset = subtract ? badTotalWeight - shouldBeWeight : shouldBeWeight - badTotalWeight;
+            return subtract ? badWeight - offset : badWeight + offset;
+        }
+
+        return 0;
+    }
+
+    private static Node buildTree(Program parent, Map<String, Program> lookup) {
+        Node[] children = null;
+        parent.totalWeight = parent.weight;
+        if(parent.childIds != null) {
+            children = new Node[parent.childIds.length];
+            for(int i = 0 ; i < parent.childIds.length ; ++i ){
+                children[i] = buildTree(lookup.get(parent.childIds[i]), lookup);
+                parent.totalWeight += children[i].p.totalWeight;
+            }
+        }
+
+        return new Node(parent, children);
+    }
+
+    private static Map<String, Program> LOOKUP;
+    private static Map<String, Program> createLookupTable(Program[] programs) {
+        if (LOOKUP == null) {
+            LOOKUP = new HashMap<>(programs.length);
+            for(Program p: programs) {
+                LOOKUP.put(p.name, p);
+            }
+        }
+
+        return LOOKUP;
     }
 
     static {
@@ -175,6 +193,22 @@ public class Day7 {
             this.weight = weight;
             this.childIds = children;
         }
+        public String toString() {
+            String childIds = "";
+            for(int i = 0 ; i < this.childIds.length ; ++i) {
+                childIds += this.childIds[i] + ", ";
+            }
+            return "{Name: " + name + ", weight: " + weight + ", childIds: [" + childIds + "], totalWeight: " + totalWeight + "}";
+        }
     }
 
+    static class Node{
+        private Program p;
+        private Node[] children;
+
+        public Node(Program p, Node[] children) {
+            this.p = p;
+            this.children = children;
+        }
+    }
 }
